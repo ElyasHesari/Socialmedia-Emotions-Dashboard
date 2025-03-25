@@ -14,7 +14,8 @@
     "daisyui": "^5.0.9",
     "npx": "^10.2.2",
     "vue": "^3.5.13",
-    "vue-chart-3": "^3.1.8"
+    "vue-chart-3": "^3.1.8",
+    "vuetify": "^3.7.18"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
