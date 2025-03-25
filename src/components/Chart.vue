@@ -64,8 +64,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, inject } from "vue";
-import chartPlugin from "chart.js/auto";
+import { ref, onMounted, watch, inject, computed } from "vue";
 
 const axios = inject("axios");
 const Chart = inject("$chart");
@@ -85,13 +84,17 @@ const loading = ref(false);
 const showErrorMessage = ref(false);
 const errorMessage = ref("");
 
-const emotions = Object.keys({
-  emotions_anger: "",
-  emotions_happiness: "",
-  emotions_sadness: "",
-  emotions_fear: "",
-  emotions_surprise: "",
-});
+const rawData = ref([]);
+
+const emotions = [
+  "emotions_anger",
+  "emotions_happiness",
+  "emotions_sadness",
+  "emotions_fear",
+  "emotions_surprise",
+];
+
+const locationNames = ["Istanbul", "Ankara", "Izmir", "Bursa", "Adana"];
 
 const fetchData = async () => {
   loading.value = true;
@@ -111,8 +114,8 @@ const fetchData = async () => {
       },
     });
 
-    console.log("Full Response:", response.data);
-    updateCharts(response.data.data);
+    rawData.value = response.data.data;
+    updateCharts();
   } catch (error) {
     console.error("Error fetching data:", error);
     errorMessage.value = "Failed to fetch data. Please try again.";
@@ -122,9 +125,8 @@ const fetchData = async () => {
   }
 };
 
-const updateCharts = (data) => {
-  console.log("All Data:", data);
-  console.log("Selected Location:", selectedLocation.value);
+const updateCharts = () => {
+  if (!rawData.value.length) return;
 
   if (barChart.value) barChart.value.destroy();
   if (pieChart.value) pieChart.value.destroy();
@@ -132,11 +134,13 @@ const updateCharts = (data) => {
   barChart.value = new Chart(barChartRef.value, {
     type: "bar",
     data: {
-      labels: data.map((item) => item.date),
+      labels: rawData.value.map((item) => item.date),
       datasets: [
         {
           label: selectedEmotion.value,
-          data: data.map((item) => item.emotions[selectedEmotion.value] || 0),
+          data: rawData.value.map(
+            (item) => item.emotions[selectedEmotion.value] || 0
+          ),
           backgroundColor: "rgba(75, 192, 192, 0.6)",
         },
       ],
@@ -156,34 +160,26 @@ const updateCharts = (data) => {
     },
   });
 
-  const locationNames = ["Istanbul", "Ankara", "Izmir", "Bursa", "Adana"];
   const locationEmotionValues = locationNames.map((location) => {
-    const filteredData = data.filter((item) => {
-      console.log(
-        "Item Location:",
-        item.location,
-        "Requested Location:",
-        location
-      );
-      return item.location === location;
-    });
-
-    console.log(`Filtered Data for ${location}:`, filteredData);
+    const filteredData = rawData.value.filter(
+      (item) => item.location === location
+    );
 
     if (filteredData.length === 0) return 0;
 
     const emotionValues = filteredData.map(
       (item) => item.emotions[selectedEmotion.value] || 0
     );
-    const avgEmotion =
-      emotionValues.reduce((sum, val) => sum + val, 0) / emotionValues.length;
 
-    return avgEmotion;
+    return emotionValues.length > 0
+      ? emotionValues.reduce((sum, val) => sum + val, 0) / emotionValues.length
+      : 0;
   });
 
-  console.log("Location Emotion Values:", locationEmotionValues);
-
-  console.log("Location Emotion Values:", locationEmotionValues);
+  const hasValidData = locationEmotionValues.some((val) => val > 0);
+  const pieData = hasValidData
+    ? locationEmotionValues
+    : locationNames.map(() => 1);
 
   pieChart.value = new Chart(pieChartRef.value, {
     type: "pie",
@@ -191,7 +187,7 @@ const updateCharts = (data) => {
       labels: locationNames,
       datasets: [
         {
-          data: locationEmotionValues,
+          data: pieData,
           backgroundColor: [
             "rgba(255, 99, 132, 0.6)",
             "rgba(54, 162, 235, 0.6)",
