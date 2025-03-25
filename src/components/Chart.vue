@@ -67,30 +67,24 @@
 import { ref, onMounted, watch, inject } from "vue";
 import chartPlugin from "chart.js/auto";
 
-// Inject axios and Chart from plugins
 const axios = inject("axios");
 const Chart = inject("$chart");
 
-// Refs for chart elements
 const barChartRef = ref(null);
 const pieChartRef = ref(null);
 
-// Chart instances
 const barChart = ref(null);
 const pieChart = ref(null);
 
-// Filter states
 const selectedEmotion = ref("emotions_happiness");
 const selectedGender = ref("all");
 const selectedAge = ref("all");
 const selectedLocation = ref("all");
 
-// UI states
 const loading = ref(false);
 const showErrorMessage = ref(false);
 const errorMessage = ref("");
 
-// Emotion types
 const emotions = Object.keys({
   emotions_anger: "",
   emotions_happiness: "",
@@ -99,7 +93,6 @@ const emotions = Object.keys({
   emotions_surprise: "",
 });
 
-// Fetch and process data
 const fetchData = async () => {
   loading.value = true;
   showErrorMessage.value = false;
@@ -112,11 +105,13 @@ const fetchData = async () => {
         filter: {
           gender: selectedGender.value,
           age: selectedAge.value,
-          location: selectedLocation.value,
+          location:
+            selectedLocation.value === "all" ? "" : selectedLocation.value,
         },
       },
     });
 
+    console.log("Full Response:", response.data);
     updateCharts(response.data.data);
   } catch (error) {
     console.error("Error fetching data:", error);
@@ -128,11 +123,12 @@ const fetchData = async () => {
 };
 
 const updateCharts = (data) => {
-  // Destroy existing charts
+  console.log("All Data:", data);
+  console.log("Selected Location:", selectedLocation.value);
+
   if (barChart.value) barChart.value.destroy();
   if (pieChart.value) pieChart.value.destroy();
 
-  // Bar Chart: Monthly emotion trend
   barChart.value = new Chart(barChartRef.value, {
     type: "bar",
     data: {
@@ -160,15 +156,34 @@ const updateCharts = (data) => {
     },
   });
 
-  // Pie Chart: Emotion distribution across locations
   const locationNames = ["Istanbul", "Ankara", "Izmir", "Bursa", "Adana"];
   const locationEmotionValues = locationNames.map((location) => {
-    return data.reduce((sum, item) => {
-      return item.location === location
-        ? sum + (item.emotions[selectedEmotion.value] || 0)
-        : sum;
-    }, 0);
+    const filteredData = data.filter((item) => {
+      console.log(
+        "Item Location:",
+        item.location,
+        "Requested Location:",
+        location
+      );
+      return item.location === location;
+    });
+
+    console.log(`Filtered Data for ${location}:`, filteredData);
+
+    if (filteredData.length === 0) return 0;
+
+    const emotionValues = filteredData.map(
+      (item) => item.emotions[selectedEmotion.value] || 0
+    );
+    const avgEmotion =
+      emotionValues.reduce((sum, val) => sum + val, 0) / emotionValues.length;
+
+    return avgEmotion;
   });
+
+  console.log("Location Emotion Values:", locationEmotionValues);
+
+  console.log("Location Emotion Values:", locationEmotionValues);
 
   pieChart.value = new Chart(pieChartRef.value, {
     type: "pie",
@@ -189,15 +204,19 @@ const updateCharts = (data) => {
     },
     options: {
       responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: `${selectedEmotion.value} Distribution`,
+        },
+      },
     },
   });
 };
 
-// Watch for filter changes
 watch([selectedEmotion, selectedGender, selectedAge, selectedLocation], () => {
   fetchData();
 });
 
-// Initial data fetch
 onMounted(fetchData);
 </script>
